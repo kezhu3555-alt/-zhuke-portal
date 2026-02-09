@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Quote,
   MapPin,
-  Terminal
+  Terminal,
+  Menu
 } from 'lucide-react';
 
 // --- Global Types ---
@@ -234,20 +235,20 @@ const DraggableQuoteWall = ({ quotes }: { quotes: string[] }) => {
   return (
     <div className="relative w-full mt-8 group" onWheel={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
        <div className="flex items-center gap-2 mb-4 text-cyan-400/80 text-xs tracking-widest uppercase animate-pulse">
-          <MoveHorizontal size={14} /> <span>Drag to Read All 53 Scriptures</span>
+          <MoveHorizontal size={14} /> <span>{window.innerWidth < 768 ? "Swipe to Read All 53 Scriptures" : "Drag to Read All 53 Scriptures"}</span>
        </div>
        <div 
           ref={scrollRef}
-          className="flex gap-6 overflow-x-auto pb-8 cursor-grab active:cursor-grabbing no-scrollbar"
+          className="flex gap-6 overflow-x-auto pb-8 cursor-grab active:cursor-grabbing no-scrollbar touch-pan-x"
           onMouseDown={handleMouseDown}
           onMouseLeave={() => setIsDragging(false)}
           onMouseUp={() => setIsDragging(false)}
           onMouseMove={handleMove}
        >
           {quotes.map((q, i) => (
-             <div key={i} className="flex-shrink-0 w-[32rem] p-8 bg-black/60 backdrop-blur-3xl border border-white/20 rounded-sm shadow-xl hover:border-cyan-500/50 transition-colors">
+             <div key={i} className="flex-shrink-0 w-80 md:w-[32rem] p-6 md:p-8 bg-black/60 backdrop-blur-3xl border border-white/20 rounded-sm shadow-xl hover:border-cyan-500/50 transition-colors">
                 <Quote size={20} className="text-cyan-500/80 mb-4" />
-                <p className="text-white font-serif text-lg leading-relaxed italic drop-shadow-[0_0_5px_rgba(255,255,255,0.5)] whitespace-pre-line">{q}</p>
+                <p className="text-white font-serif text-base md:text-lg leading-relaxed italic drop-shadow-[0_0_5px_rgba(255,255,255,0.5)] whitespace-pre-line">{q}</p>
              </div>
           ))}
           <div className="w-8 flex-shrink-0" />
@@ -260,10 +261,40 @@ const DraggableQuoteWall = ({ quotes }: { quotes: string[] }) => {
 const App = () => {
   const [page, setPage] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const sectionRefs = useRef<(HTMLElement | null)[]>([]);
 
-  // GSAP Observer for Rigid Snap
+  // 1. Detect Mobile
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // 2. Mobile: Intersection Observer for Cinematic Backgrounds
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const index = Number(entry.target.getAttribute('data-index'));
+          setPage(index);
+        }
+      });
+    }, { threshold: 0.4 }); // Trigger when 40% visible
+
+    sectionRefs.current.forEach((ref) => {
+      if (ref) observer.observe(ref);
+    });
+
+    return () => observer.disconnect();
+  }, [isMobile]);
+
+  // 3. Desktop: GSAP Observer for Rigid Snap
   useLayoutEffect(() => {
-    if (typeof window.Observer === 'undefined') return;
+    if (isMobile || typeof window.Observer === 'undefined') return;
     
     const observer = window.Observer.create({
       target: window,
@@ -275,7 +306,7 @@ const App = () => {
       preventDefault: true
     });
     return () => observer.kill();
-  }, [page, isAnimating]);
+  }, [page, isAnimating, isMobile]);
 
   const changePage = (next: number) => {
     setIsAnimating(true);
@@ -284,14 +315,14 @@ const App = () => {
   };
 
   return (
-    <div className="relative w-full h-full bg-black text-slate-200 overflow-hidden font-sans select-none">
+    <div className={`relative w-full h-full bg-black text-slate-200 font-sans select-none ${isMobile ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}`}>
       
       {/* 1. Cinematic Background Engine */}
       <CinematicBackgrounds pageIndex={page} />
       
       {/* 2. Fixed HUD */}
-      {/* Top-Left: Identity */}
-      <div className="fixed top-8 left-8 z-50 flex flex-col pointer-events-none">
+      {/* Top-Left: Identity (Scaled down on mobile) */}
+      <div className="fixed top-6 left-6 md:top-8 md:left-8 z-50 flex flex-col pointer-events-none origin-top-left scale-75 md:scale-100">
          <h1 className="text-white font-bold tracking-[0.2em] text-sm md:text-base drop-shadow-[0_4px_4px_rgba(0,0,0,1)]">
             祝可 (ZHU KE)
          </h1>
@@ -304,13 +335,13 @@ const App = () => {
       </div>
 
       {/* Bottom-Left: Page Index */}
-      <div className="fixed bottom-8 left-8 z-50 pointer-events-none">
-         <span className="text-6xl font-thin font-mono text-white/60 drop-shadow-lg">{`0${page + 1}`}</span>
-         <span className="text-sm text-cyan-500/80 ml-2 font-mono drop-shadow-md">/ 07</span>
+      <div className="fixed bottom-6 left-6 md:bottom-8 md:left-8 z-50 pointer-events-none">
+         <span className="text-4xl md:text-6xl font-thin font-mono text-white/60 drop-shadow-lg">{`0${page + 1}`}</span>
+         <span className="text-xs md:text-sm text-cyan-500/80 ml-2 font-mono drop-shadow-md">/ 07</span>
       </div>
 
-      {/* Right Sidebar: Scripture Anchor */}
-      <div className="fixed right-0 top-0 bottom-0 w-20 md:w-24 border-l border-white/5 bg-black/20 backdrop-blur-[4px] z-40 flex flex-col items-center justify-center pointer-events-none">
+      {/* Right Sidebar: Scripture Anchor (Hidden on Mobile) */}
+      <div className="hidden md:flex fixed right-0 top-0 bottom-0 w-20 md:w-24 border-l border-white/5 bg-black/20 backdrop-blur-[4px] z-40 flex-col items-center justify-center pointer-events-none">
          <div className="h-[70vh] flex flex-col justify-between items-center py-4">
             {TITAN_DATA.map((item, idx) => (
                <div key={idx} className={`transition-all duration-700 writing-vertical-rl text-xs tracking-[0.3em] font-serif relative
@@ -321,38 +352,43 @@ const App = () => {
          </div>
       </div>
 
-      {/* 3. Horizontal Scroll Container */}
+      {/* 3. Main Content Container */}
       <div 
-        className="flex w-[700vw] h-full transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform"
-        style={{ transform: `translateX(-${page * 100}vw)` }}
+        className={`flex transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform ${isMobile ? 'flex-col w-full' : 'w-[700vw] h-full'}`}
+        style={{ transform: isMobile ? 'none' : `translateX(-${page * 100}vw)` }}
       >
-         {TITAN_DATA.map((chapter) => (
-            <section key={chapter.id} className="w-[100vw] h-full flex items-center justify-center relative px-6 md:pl-32 md:pr-48">
+         {TITAN_DATA.map((chapter, i) => (
+            <section 
+               key={chapter.id}
+               ref={(el) => { sectionRefs.current[i] = el; }}
+               data-index={i}
+               className={`relative flex items-center justify-center ${isMobile ? 'w-full min-h-screen py-24 px-4' : 'w-[100vw] h-full px-6 md:pl-32 md:pr-48'}`}
+            >
                
-               {/* Content Card (High-End Deep Glassmorphism) */}
-               <div className={`w-full max-w-4xl p-10 md:p-14 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-sm shadow-2xl transition-all duration-1000 delay-300
-                  ${page === chapter.id ? 'opacity-100 translate-y-0 filter-none' : 'opacity-0 translate-y-20 blur-sm'}`}>
+               {/* Content Card (Responsive Width & Padding) */}
+               <div className={`w-full md:max-w-4xl bg-black/60 backdrop-blur-3xl border border-white/10 rounded-sm shadow-2xl transition-all duration-1000 
+                  ${isMobile ? 'p-6 w-[95%] mx-auto' : `p-10 md:p-14 delay-300 ${page === chapter.id ? 'opacity-100 translate-y-0 filter-none' : 'opacity-0 translate-y-20 blur-sm'}`}`}>
                   
                   {/* Header */}
-                  <div className="flex items-center gap-4 mb-8">
-                     <div className="p-3 bg-cyan-900/20 border border-cyan-500/30 rounded text-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.2)]">
+                  <div className="flex items-center gap-4 mb-6 md:mb-8">
+                     <div className="p-2 md:p-3 bg-cyan-900/20 border border-cyan-500/30 rounded text-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.2)]">
                         {chapter.icon}
                      </div>
-                     <div className="h-[1px] w-16 bg-gradient-to-r from-cyan-500/50 to-transparent"></div>
-                     <span className="text-cyan-200/60 font-mono text-xs tracking-[0.4em] uppercase">{chapter.realm}</span>
+                     <div className="h-[1px] w-12 md:w-16 bg-gradient-to-r from-cyan-500/50 to-transparent"></div>
+                     <span className="text-cyan-200/60 font-mono text-[10px] md:text-xs tracking-[0.2em] md:tracking-[0.4em] uppercase">{chapter.realm}</span>
                   </div>
 
                   {/* Title Block */}
-                  <h2 className="text-4xl md:text-7xl font-bold font-serif text-white mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+                  <h2 className="text-3xl md:text-7xl font-bold font-serif text-white mb-3 md:mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] leading-tight">
                      {chapter.title}
                   </h2>
-                  <h3 className="text-lg md:text-xl text-cyan-400/90 font-light italic tracking-widest mb-10 pl-1 border-l-2 border-cyan-500/50">
+                  <h3 className="text-sm md:text-xl text-cyan-400/90 font-light italic tracking-widest mb-6 md:mb-10 pl-1 border-l-2 border-cyan-500/50">
                      {chapter.subtitle}
                   </h3>
 
                   {/* Text Content */}
                   {!chapter.isQuoteWall && (
-                     <div className="space-y-6 text-sm md:text-lg leading-loose text-white font-serif text-justify border-l border-white/20 pl-8 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+                     <div className="space-y-4 md:space-y-6 text-sm md:text-lg leading-relaxed md:leading-loose text-white font-serif text-justify border-l border-white/20 pl-4 md:pl-8 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
                         {chapter.content && chapter.content.map((p, i) => (
                            <p key={i}>{p}</p>
                         ))}
@@ -362,7 +398,7 @@ const App = () => {
                   {/* Quote Wall (Intro Text + Scroll) */}
                   {chapter.isQuoteWall && (
                      <div className="space-y-6">
-                        <div className="text-sm md:text-lg leading-loose text-white font-serif text-justify border-l border-white/20 pl-8 drop-shadow-md">
+                        <div className="text-sm md:text-lg leading-relaxed md:leading-loose text-white font-serif text-justify border-l border-white/20 pl-4 md:pl-8 drop-shadow-md">
                            {chapter.content && chapter.content.map((p, i) => (
                               <p key={i}>{p}</p>
                            ))}
@@ -373,18 +409,18 @@ const App = () => {
 
                   {/* Contact */}
                   {chapter.contact && (
-                     <div className="mt-12 flex flex-col md:flex-row gap-8">
+                     <div className="mt-8 md:mt-12 flex flex-col md:flex-row gap-6 md:gap-8">
                         <div className="group cursor-pointer">
-                           <div className="text-xs text-cyan-500/80 uppercase tracking-widest mb-2 group-hover:text-cyan-400 flex items-center gap-2">
+                           <div className="text-[10px] md:text-xs text-cyan-500/80 uppercase tracking-widest mb-1 md:mb-2 group-hover:text-cyan-400 flex items-center gap-2">
                               <MapPin size={12} /> Mobile / WeChat
                            </div>
-                           <div className="text-3xl font-mono text-white border-b border-white/20 pb-2 group-hover:border-cyan-400 transition-all drop-shadow-glow">{chapter.contact.wx}</div>
+                           <div className="text-xl md:text-3xl font-mono text-white border-b border-white/20 pb-2 group-hover:border-cyan-400 transition-all drop-shadow-glow">{chapter.contact.wx}</div>
                         </div>
                         <div className="group cursor-pointer">
-                           <div className="text-xs text-purple-500/80 uppercase tracking-widest mb-2 group-hover:text-purple-400 flex items-center gap-2">
+                           <div className="text-[10px] md:text-xs text-purple-500/80 uppercase tracking-widest mb-1 md:mb-2 group-hover:text-purple-400 flex items-center gap-2">
                               <Terminal size={12} /> QQ
                            </div>
-                           <div className="text-3xl font-mono text-white border-b border-white/20 pb-2 group-hover:border-purple-400 transition-all drop-shadow-glow">{chapter.contact.qq}</div>
+                           <div className="text-xl md:text-3xl font-mono text-white border-b border-white/20 pb-2 group-hover:border-purple-400 transition-all drop-shadow-glow">{chapter.contact.qq}</div>
                         </div>
                      </div>
                   )}
@@ -394,7 +430,7 @@ const App = () => {
          ))}
       </div>
 
-      {/* Navigation Hint */}
+      {/* Navigation Hint (Hidden on Mobile) */}
       <div className="fixed bottom-8 right-32 z-30 flex items-center gap-3 text-cyan-500/60 animate-pulse hidden md:flex">
          <span className="text-[10px] tracking-[0.3em] uppercase">Scroll to Pan</span>
          <ChevronRight size={14} />
